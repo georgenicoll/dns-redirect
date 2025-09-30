@@ -1,0 +1,17 @@
+[package]
+name = "dns-redirect"
+version = "0.1.0"
+edition = "2024"
+
+[lints.rust]
+unused_crate_dependencies = "warn"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+
+[dependencies]
+hickory-server = "0.24"
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
