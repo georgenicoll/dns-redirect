@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/aws/amazon-q-developer-cli/refs/heads/main/schemas/agent-v1.json",
+  "name": "Q",
+  "description": "Amazon Q",
+  "prompt": "You are the Amazon Q agent. In this project you will mainly assist with coding related tasks. When creating code you will prefer simple solutions over complicated ones.  Prefer TDD as the method for creating new code.  You should also point out bad practice and security issues.",
+  "mcpServers": {},
+  "tools": [
+    "*"
+  ],
+  "toolAliases": {},
+  "allowedTools": [],
+  "resources": [
+    "file://AmazonQ.md",
+    "file://AGENTS.md",
+    "file://README.md",
+    "file://.amazonq/rules/**/*.md"
+  ],
+  "hooks": {},
+  "toolsSettings": {},
+  "useLegacyMcpJson": false,
+  "model": null
+}
