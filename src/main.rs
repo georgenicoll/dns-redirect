@@ -1,17 +1,42 @@
 use std::collections::HashMap;
 
+use anyhow::Result;
+use clap::{CommandFactory, Parser};
 use hickory_proto::op::{Header, ResponseCode};
 use hickory_proto::rr::rdata::CNAME;
 use hickory_proto::rr::{LowerName, Name, RData, Record, RecordType};
 use hickory_server::authority::MessageResponseBuilder;
 use hickory_server::server::{Request, RequestHandler, ResponseHandler, ResponseInfo, ServerFuture};
+use serde::{Deserialize, Deserializer};
 use tokio::net::UdpSocket;
 
 
-#[derive(Clone)]
+fn deserialize_regex<'de, D>(deserializer: D) -> Result<regex::Regex, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    regex::Regex::new(&s).map_err(serde::de::Error::custom)
+}
+
+#[derive(Clone, Deserialize)]
 struct Replacement {
+    #[serde(deserialize_with = "deserialize_regex")]
     from: regex::Regex,
     to: String,
+}
+
+
+#[derive(Deserialize)]
+struct Config {
+    bind_address: String,
+    replacements: Vec<Replacement>,
+}
+
+impl Config {
+    fn load_from_json(json: &str) -> Result<Self> {
+        serde_json::from_str(json).map_err(|e| e.into())
+    }
 }
 
 
@@ -90,21 +115,47 @@ impl RequestHandler for DomainConversionHandler {
 
 }
 
-async fn create_server(address: &str, replacements: Vec<Replacement>) -> Result<ServerFuture<DomainConversionHandler>, Box<dyn std::error::Error>> {
+async fn create_server(config: Config) -> Result<ServerFuture<DomainConversionHandler>, Box<dyn std::error::Error>> {
     // Bind to UDP port 8053 (you can change this)
-    let socket = UdpSocket::bind(address).await?;
+    let socket = UdpSocket::bind(config.bind_address).await?;
 
     // Create a server
-    let mut server = ServerFuture::new(DomainConversionHandler::new(replacements));
+    let mut server = ServerFuture::new(DomainConversionHandler::new(config.replacements));
     server.register_socket(socket);
 
     Ok(server)
 }
 
 
+#[derive(Parser, Debug)]
+#[command(name = "dns-redirect")]
+#[command(about = "A simple DNS server that redirects queries based on regex replacements using cname records.")]
+struct Args {
+    #[arg(short, long, value_name = "FILE", default_value = "config.json", help = "Path to the JSON configuration file.")]
+    config_file: String,
+}
+
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>>{
-    let mut server = create_server("127.0.0.1:8053", vec![]).await?;
+    Args::command().print_help()?;
+
+    let args = Args::parse();
+    println!("");
+    println!("Using config file: {}", args.config_file);
+    println!("");
+    let json = std::fs::read_to_string(args.config_file)?;
+    let config = Config::load_from_json(&json)?;
+
+    println!("");
+    println!("Starting server on {} ...", &config.bind_address);
+    println!("");
+
+    let mut server = create_server(config).await?;
+
+    println!("");
+    println!("Server Running on ...");
+    println!("");
 
     // Run the server
     server.block_until_done().await?;
@@ -155,7 +206,7 @@ mod tests {
 
     async fn test_server(replacements: Vec<Replacement>, test_cases: Vec<(&str, &str)>) {
         let address = format!("127.0.0.1:{}", find_free_port().unwrap());
-        let mut server = create_server(&address, replacements).await.unwrap();
+        let mut server = create_server(Config::new(address.clone(), replacements)).await.unwrap();
 
         let resolver = setup_resolver(&address);
 
@@ -243,12 +294,12 @@ mod tests {
     #[tokio::test]
     async fn test_no_match_returns_nxdomain() {
         let address = format!("127.0.0.1:{}", find_free_port().unwrap());
-        let mut server = create_server(&address, vec![
+        let mut server = create_server(Config::new(address.clone(), vec![
             Replacement {
                 from: regex::Regex::new(r"^(.*)\.mnh.?$").unwrap(),
                 to: "dont.care.".to_string(),
             }
-        ]).await.unwrap();
+        ])).await.unwrap();
 
         let resolver = setup_resolver(&address);
 
@@ -266,12 +317,12 @@ mod tests {
     #[tokio::test]
     async fn test_wrong_query_type_returns_nxdomain() {
         let address = format!("127.0.0.1:{}", find_free_port().unwrap());
-        let mut server = create_server(&address, vec![
+        let mut server = create_server(Config::new(address.clone(), vec![
             Replacement {
                 from: regex::Regex::new(r"^(.*)\.net.?$").unwrap(),
                 to: "dont.care.".to_string(),
             }
-        ]).await.unwrap();
+        ])).await.unwrap();
 
         let resolver = setup_resolver(&address);
 
@@ -284,6 +335,51 @@ mod tests {
             Ok(res) => panic!("Expected NXDomain but got result: {:?}", res),
             Err(e) => assert!(e.is_nx_domain(), "Expected NXDomain but got different error: {}", e),
         };
+    }
+
+    #[test]
+    fn test_load_replacements_from_json() {
+        let json = r#"
+        [
+            {
+                "from": "^(.*)\\.mnh.?$",
+                "to": "{1}.lan."
+            },
+            {
+                "from": "^(.*)\\.(.*)\\.pod.?$",
+                "to": "{2}.{1}.pod."
+            }
+        ]
+        "#;
+
+        let replacements: Vec<Replacement> = serde_json::from_str(json).unwrap();
+
+        assert_eq!(replacements.len(), 2);
+        assert!(replacements[0].from.is_match("bob.mnh"));
+        assert_eq!(replacements[0].to, "{1}.lan.");
+        assert!(replacements[1].from.is_match("alice.chad.pod"));
+        assert_eq!(replacements[1].to, "{2}.{1}.pod.");
+    }
+
+    #[test]
+    fn test_load_config_from_json_single_replacement() {
+        let json = r#"
+        {
+            "bind_address": "98.99.100.101:8784",
+            "replacements": [
+                {
+                    "from": "^(.*)\\.mnh.?$",
+                    "to": "{1}.lan."
+                }
+            ]
+        }
+        "#;
+
+        let config = Config::load_from_json(json).unwrap();
+        assert_eq!(config.bind_address, "98.99.100.101:8784");
+        assert_eq!(config.replacements.len(), 1);
+        assert!(config.replacements[0].from.is_match("bob.mnh"));
+        assert_eq!(config.replacements[0].to, "{1}.lan.");
     }
 
 }
