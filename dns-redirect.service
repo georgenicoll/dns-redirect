@@ -1,0 +1,16 @@
+[Unit]
+Description=DNS Redirect Server
+After=network.target
+
+[Service]
+Type=simple
+User=dns-redirect
+Group=dns-redirect
+ExecStart=/usr/local/bin/dns-redirect --config-file /etc/dns-redirect/config.json
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
