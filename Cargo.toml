@@ -12,6 +12,17 @@ pedantic = "warn"
 nursery = "warn"
 
 [dependencies]
-hickory-server = "0.24"
-tokio = { version = "1.40", features = ["full"] }
-async-trait = "0.1"
+#clap = { version = "4.5.48", features = ["derive"] }
+#thiserror = "2.0.17"
+async-trait = "0.1.89"
+hickory-proto = "0.25.2"
+hickory-server = "0.25.2"
+regex = "1"
+serde = { version = "1.0.228", features = ["derive"] }
+strfmt = "0.2.5"
+tokio = { version = "1.47.1", features = ["macros", "io-util", "net", "rt-multi-thread"] }
+
+[dev-dependencies]
+futures = "0.3.28"
+hickory-resolver = "0.25.2"
+tokio = { version = "1.47.1", features = ["test-util"] }
