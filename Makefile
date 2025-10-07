@@ -12,5 +12,8 @@ fmt:
 clippy:
 	cargo clippy -- -D warnings
 
-arm64: fmt clippy
+arm64-gnu: fmt clippy
 	cargo build --release --target aarch64-unknown-linux-gnu
+
+arm64-musl: fmt clippy
+	cargo build --release --target aarch64-unknown-linux-musl
