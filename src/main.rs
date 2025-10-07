@@ -160,7 +160,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut server = create_server(config).await?;
 
     println!();
-    println!("Server Running on ...");
+    println!("Server Running ...");
     println!();
 
     // Run the server

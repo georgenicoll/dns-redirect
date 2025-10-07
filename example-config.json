@@ -1,0 +1,9 @@
+{
+    "bind_address": "127.0.0.0:8053",
+    "replacements": [
+        {
+            "from": "^(.*)\\.internal-net(\\.?)$",
+            "to": "{1}.lan{2}"
+        }
+    ]
+}

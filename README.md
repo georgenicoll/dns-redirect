@@ -9,6 +9,7 @@
 ### Prerequisites
 
 - Rust toolchain (edition 2024)
+- musl toolchain (if cross compiling using `make arm64-musl`)
 - Cargo package manager
 
 ### Build for Native Target
@@ -27,30 +28,32 @@ Alternatively, use the provided Makefile which includes formatting and linting:
 make build
 ```
 
-### Cross-Compile for ARM64
+### Cross-Compile for ARM64 with musl (can also do for gnu, see the armd64-gnu target)
 
 To cross-compile for ARM64 (aarch64) Linux systems:
 
 1. Install the ARM64 target and cross-compiler:
 
 ```bash
-rustup target add aarch64-unknown-linux-gnu
-sudo apt install gcc-aarch64-linux-gnu
+rustup target add aarch64-unknown-linux-musl
+#sudo apt install gcc-aarch64-linux-gnu #<-- this is the only thing needed when cross compiling using glibc
+curl https://musl.cc/aarch64-linux-musl-cross.tgz -o aarch64-linux-musl-cross.tgz
+sudo tar -xzf aarch64-linux-musl-cross.tgz -C /opt
 ```
 
 2. Build for ARM64:
 
 ```bash
-cargo build --release --target aarch64-unknown-linux-gnu
+cargo build --release --target aarch64-unknown-linux-musl
 ```
 
 Or using the Makefile:
 
 ```bash
-make arm64
+make arm64-musl
 ```
 
-The ARM64 binary will be located at `target/aarch64-unknown-linux-gnu/release/dns-redirect`.
+The ARM64 binary will be located at `target/aarch64-unknown-linux-musl/release/dns-redirect`.
 
 ### Running the Server
 
